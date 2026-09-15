@@ -1,6 +1,5 @@
 export interface Env {
   HACKCLUB_KEY?: string;
-  SHARED_SECRET: string;
   RATE_LIMIT_KV: KVNamespace;
 }
 
@@ -25,16 +24,7 @@ export default {
       return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
     }
 
-    // --- 1. Shared secret check ---
-    const providedSecret = request.headers.get("X-Kairos-Auth");
-    if (!providedSecret || providedSecret !== env.SHARED_SECRET) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // --- 2. Per-IP rate limiting ---
+    // --- 1. Per-IP rate limiting ---
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const bucket = Math.floor(Date.now() / (RATE_LIMIT_WINDOW_SECONDS * 1000));
     const rateLimitKey = `rl:${ip}:${bucket}`;
@@ -53,7 +43,7 @@ export default {
       expirationTtl: RATE_LIMIT_WINDOW_SECONDS + 5
     });
 
-    // --- 3. Payload validation ---
+    // --- 2. Payload validation ---
     try {
       const body = await request.json() as { messages?: unknown };
       const messages = body.messages;
@@ -79,8 +69,17 @@ export default {
         }
       }
 
-      const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
-      if (env.HACKCLUB_KEY) upstreamHeaders["Authorization"] = `Bearer ${env.HACKCLUB_KEY}`;
+      if (!env.HACKCLUB_KEY) {
+        return new Response(JSON.stringify({ error: "AI relay is not configured" }), {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const upstreamHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${env.HACKCLUB_KEY}`
+      };
 
       const upstream = await fetch("https://ai.hackclub.com/proxy/v1/chat/completions", {
         method: "POST",
