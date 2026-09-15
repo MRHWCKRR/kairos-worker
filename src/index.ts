@@ -1,5 +1,6 @@
 export interface Env {
   HACKCLUB_KEY?: string;
+  SHARED_SECRET: string;
   RATE_LIMIT_KV: KVNamespace;
 }
 
@@ -22,6 +23,16 @@ export default {
 
     if (request.method !== "POST") {
       return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+    }
+
+    // The Worker is an internal relay target. Only the trusted Vercel relay
+    // may call it; the browser must never know this shared secret.
+    const providedSecret = request.headers.get("X-Kairos-Auth");
+    if (!providedSecret || providedSecret !== env.SHARED_SECRET) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
     // --- 1. Per-IP rate limiting ---
