@@ -7,7 +7,7 @@ export interface Env {
 const RATE_LIMIT_MAX_REQUESTS = 20; // per window, per IP
 const RATE_LIMIT_WINDOW_SECONDS = 60;
 const MAX_MESSAGES = 40;
-const MAX_MESSAGE_LENGTH = 4000;
+const MAX_MESSAGE_LENGTH = 12000;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
